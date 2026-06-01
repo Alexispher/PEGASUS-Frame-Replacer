@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PEGASUS FRAME PLACER - AI TERMINAL</title>
+    <title>Command Prompt - PEGASUS FRAME PLACER</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
     <style>
-        /* Terminal & Camera Engine Viewport */
+        /* Classic Windows CMD Viewport */
         body { 
             margin: 0; 
-            background-color: #000510; 
-            color: #4da6ff; 
-            font-family: 'Courier New', Courier, monospace; 
+            background-color: #000000; 
+            color: #ffffff; 
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; 
             overflow: hidden; 
             user-select: none;
         }
@@ -26,7 +26,7 @@
             width: 100vw; height: 100vh; 
             z-index: 1; 
             display: none; 
-            background-color: #000;
+            background-color: #000000;
         }
 
         /* Contain rendering to map precise AI coordinates on iPhone display */
@@ -35,64 +35,77 @@
             top: 0; left: 0;
             width: 100%; height: 100%; 
             object-fit: contain; 
-            background: #000;
+            background: #000000;
         }
         video { z-index: 1; }
         #detection-canvas { z-index: 2; pointer-events: none; }
 
-        /* Overlay Terminal HUD Interface */
+        /* Windows CMD Window Terminal Overlay */
         #terminal { 
             position: absolute; 
             top: 0; left: 0; 
             width: 100vw; height: 100vh; 
             z-index: 3; 
-            padding: 20px; 
+            padding: 15px; 
             box-sizing: border-box; 
-            background: rgba(0, 5, 16, 0.85); 
-            transition: background 0.5s;
+            background: #000000; 
+            transition: background 0.3s;
+            overflow-y: auto;
         }
         
-        /* Translucent HUD mode when tactical camera optics are active */
+        /* Transparent CMD mode when camera optics are active */
         .camera-active-mode {
-            background: rgba(0, 5, 16, 0.25) !important;
-            text-shadow: 1px 1px 3px #000;
+            background: rgba(0, 0, 0, 0.70) !important;
+            text-shadow: 1px 1px 2px #000000;
         }
 
-        h1 { 
-            color: #ffffff; 
-            text-shadow: 0 0 8px #4da6ff; 
-            font-size: 1.6rem;
-            border-bottom: 2px solid #4da6ff;
-            padding-bottom: 10px;
-            margin-top: 10px;
+        /* Dedicated Space for your ASCII Art Banner */
+        .ascii-banner {
+            color: #ffffff;
+            font-family: 'Consolas', 'Lucida Console', monospace;
+            font-size: 8px; /* Adjusted for mobile screens */
+            line-height: 1.2;
+            white-space: pre;
+            margin: 15px 0;
+            display: block;
         }
 
-        .menu { margin-top: 25px; }
+        .cmd-header {
+            color: #cccccc;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+        }
+
+        .menu { margin: 20px 0; }
         .menu-item { 
-            margin: 12px 0; 
-            font-size: 1.1rem; 
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .menu-item:hover, .menu-item:active { 
-            color: #ffffff; 
-            background-color: #004080; 
-            display: inline-block;
-            padding: 2px 5px;
+            margin: 8px 0; 
+            font-size: 1rem;
+            color: #ffffff;
         }
 
-        /* Terminal Command Input */
-        .cmd-line { margin-top: 25px; font-size: 1.1rem; color: #ffffff; }
+        /* Classic CMD Prompt Line */
+        .cmd-line { 
+            margin-top: 20px; 
+            font-size: 1rem; 
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+        }
+        
+        .prompt-text {
+            color: #ffffff;
+            margin-right: 5px;
+        }
+
         #cmd-input { 
             background: transparent; 
             border: none; 
             color: #ffffff; 
-            font-family: 'Courier New', Courier, monospace; 
-            font-size: 1.1rem; 
+            font-family: 'Consolas', 'Lucida Console', monospace; 
+            font-size: 1rem; 
             outline: none; 
-            width: 40px; 
-            border-bottom: 2px solid #4da6ff;
-            text-align: center;
+            flex: 1;
+            caret-color: #ffffff; /* Classic white blinking cursor feel */
         }
 
         /* Central Manual Targeting Overlay (Reticle Frame) */
@@ -101,44 +114,40 @@
             top: 50%; left: 50%; 
             transform: translate(-50%, -50%); 
             width: 240px; height: 240px; 
-            border: 3px solid #ff3333; 
+            border: 2px solid #ff3333; 
             z-index: 4; 
             display: none; 
             transition: all 0.2s ease-out; 
-            box-shadow: 0 0 15px rgba(255, 51, 51, 0.4) inset;
         }
 
         /* Tactical Target Frame HUD Status Text */
         #target-status {
             position: absolute;
-            top: -30px; left: 0;
+            top: -25px; left: 0;
             color: #ff3333;
             font-weight: bold;
-            font-size: 0.85rem;
-            letter-spacing: 2px;
-            background: rgba(0,0,0,0.5);
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            background: #000000;
             padding: 2px 5px;
         }
 
-        /* Visual State Modification: Target Locked (Green Alignment) */
+        /* Target Locked State (Green Alignment) */
         .aligned { 
             border-color: #00ff00 !important; 
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5) inset !important; 
-            transform: translate(-50%, -50%) scale(0.95) !important;
         }
         .aligned #target-status { 
             color: #00ff00 !important; 
         }
 
         #logs { 
-            margin-top: 15px; 
-            font-size: 0.85rem; 
-            color: #88ccee; 
-            min-height: 40px;
+            margin-top: 20px; 
+            font-size: 0.9rem; 
+            color: #ffffff; 
+            min-height: 30px;
             line-height: 1.4;
-            background: rgba(0, 10, 30, 0.6);
-            padding: 8px;
-            border-left: 3px solid #4da6ff;
+            border-top: 1px dashed #555555;
+            padding-top: 10px;
         }
     </style>
 </head>
@@ -153,20 +162,32 @@
         <div id="target-status">RETICLE: SEARCHING...</div>
     </div>
 
-    <div id="terminal">
-        <h1>> PEGASUS FRAME PLACER_</h1>
-        <div id="logs">SYSTEM ONLINE. AWAITING PARAMS.</div>
-        
-        <div class="menu">
-            <div class="menu-item" onclick="runCommand('1')">[1] ENGAGE OPTICAL CORE MODULE (AI)</div>
-            <div class="menu-item" onclick="runCommand('2')">[2] CALIBRATE TELEMETRY SENSORES</div>
-            <div class="menu-item" onclick="runCommand('3')">[3] NETWORK INTERFACE DIAGNOSTICS</div>
-            <div class="menu-item" style="color: #ff6666;" onclick="runCommand('0')">[0] SYSTEM PURGE (LOCAL APPLICATION RESET)</div>
+    <div id="terminal" onclick="focusInput()">
+        <div class="cmd-header">
+            Microsoft Windows [Version 10.0.22631.3527]<br>
+            (c) Microsoft Corporation. All rights reserved.
         </div>
 
+        <pre class="ascii-banner">
+  _____  ______ _____  _______  _    _  _____ 
+ |  __ \|  ____/ ____|/ /_   _|| |  | |/ ____|
+ | |__) | |__ | |  __ / /_ | |  | |  | | (___  
+ |  ___/|  __|| | |_ | '_ \| |  | |  | |\___ \ 
+ | |    | |___| |__| | (_) | |  | |__| |____) |
+ |_|    |______\_____|\___/___|  \____/|_____/ 
+        </pre>
+        <div class="menu">
+            <div class="menu-item">Type [1] to ENGAGE OPTICAL CORE MODULE (AI)</div>
+            <div class="menu-item">Type [2] to CALIBRATE TELEMETRY SENSORS</div>
+            <div class="menu-item">Type [3] to NETWORK INTERFACE DIAGNOSTICS</div>
+            <div class="menu-item">Type [0] to SYSTEM PURGE (LOCAL APPLICATION RESET)</div>
+        </div>
+
+        <div id="logs">C:\PEGASUS> Awaiting operational parameters...</div>
+
         <div class="cmd-line">
-            <span>>_ CMD: </span>
-            <input type="number" id="cmd-input" inputmode="numeric" onkeyup="checkInput(event)">
+            <span class="prompt-text">C:\PEGASUS&gt;</span>
+            <input type="number" id="cmd-input" inputmode="numeric" onkeyup="checkInput(event)" autofocus autocomplete="off">
         </div>
     </div>
 
@@ -179,16 +200,22 @@
         const targetingBox = document.getElementById('targeting-box');
         const targetStatus = document.getElementById('target-status');
         const logs = document.getElementById('logs');
+        const cmdInput = document.getElementById('cmd-input');
         
         let stream = null;
         let detectionModel = null;
         let detecting = false;
         let lastLogTime = 0;
 
+        // Automatically focus input when clicking anywhere on the CMD terminal
+        function focusInput() {
+            cmdInput.focus();
+        }
+
         function checkInput(event) {
             if (event.key === 'Enter') {
-                runCommand(event.target.value);
-                event.target.value = '';
+                runCommand(cmdInput.value);
+                cmdInput.value = '';
             }
         }
 
@@ -198,7 +225,7 @@
                     startCamera();
                     break;
                 case '2':
-                    logMsg("CALIBRATING GYROSCOPIC TELEMETRY... STATUS: OPERATIONAL.");
+                    logMsg("CALIBRATING GYROSCOPIC TELEMETRY... STATUS: OPERACIONAL.");
                     break;
                 case '3':
                     logMsg("INFRA LATENCY: 12ms. NETWORK LINK SECURE.");
@@ -215,13 +242,13 @@
         async function startCamera() {
             logMsg("INITIALIZING BACK OPTICAL CAPTURE PIPELINE...");
             try {
+                // Direct user gesture interaction for iOS deployment
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment" } 
                 });
                 video.srcObject = stream;
                 
                 video.onloadedmetadata = async () => {
-                    // Synchronize processing canvas resolution to raw video width/height
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
 
@@ -250,10 +277,7 @@
         async function detectObjects() {
             if (!detecting || !detectionModel) return;
 
-            // Extract object tracking vector predictions from mobile viewport
             const predictions = await detectionModel.detect(video);
-
-            // Wipe drawing canvas from historical frames
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             let highestConfidencePred = null;
@@ -262,29 +286,27 @@
                 const [x, y, width, height] = prediction.bbox;
                 const score = Math.round(prediction.score * 100);
 
-                // Noise reduction gate (ignore low confidence tracking matrices)
                 if (score < 55) return;
 
                 if (!highestConfidencePred || prediction.score > highestConfidencePred.score) {
                     highestConfidencePred = prediction;
                 }
 
-                // Render bounding box matrices to processing viewport
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = "#4da6ff"; 
+                // Render classic thin lines for CMD aesthetic bounding boxes
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#ffffff"; 
                 ctx.strokeRect(x, y, width, height);
 
-                // Render target vector identification background plates
-                ctx.fillStyle = "rgba(0, 5, 16, 0.6)";
-                ctx.fillRect(x, y > 30 ? y - 30 : y, width > 220 ? 220 : width, 30);
+                // Text background plates
+                ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+                ctx.fillRect(x, y > 25 ? y - 25 : y, width > 200 ? 200 : width, 24);
 
-                // Print classification tag data
+                // Tag text execution
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 16px 'Courier New', monospace";
-                ctx.fillText(`SCAN: ${prediction.class.toUpperCase()} [${score}%]`, x + 8, y > 30 ? y - 10 : y + 20);
+                ctx.font = "14px 'Consolas', monospace";
+                ctx.fillText(`SCAN: ${prediction.class.toUpperCase()} [${score}%]`, x + 5, y > 25 ? y - 8 : y + 16);
             });
 
-            // Automated tactical HUD telemetry logging routing
             if (highestConfidencePred) {
                 const now = Date.now();
                 if (now - lastLogTime > 1500) { 
@@ -295,7 +317,6 @@
                 }
             }
 
-            // High performance animation frame request scheduling
             requestAnimationFrame(detectObjects);
         }
 
@@ -316,20 +337,16 @@
             detecting = false;
 
             try {
-                // Kill video media streams immediately
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     stream = null;
                 }
 
-                // Empty tracking canvases
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // Purge application web storage vectors
                 localStorage.clear();
                 sessionStorage.clear();
 
-                // Explicitly await formal deletion response from local IndexedDB instances
                 if (window.indexedDB && indexedDB.databases) {
                     const databases = await indexedDB.databases();
                     await Promise.all(
@@ -345,7 +362,6 @@
                     );
                 }
 
-                // Purge application cache namespaces
                 if ("caches" in window) {
                     const cacheNames = await caches.keys();
                     await Promise.all(
@@ -353,7 +369,6 @@
                     );
                 }
 
-                // Unregister local progressive application service workers
                 if ("serviceWorker" in navigator) {
                     const registrations = await navigator.serviceWorker.getRegistrations();
                     await Promise.all(
@@ -374,7 +389,7 @@
         }
 
         function logMsg(msg) {
-            logs.innerText = "> " + msg;
+            logs.innerHTML = "C:\\PEGASUS&gt; " + msg;
         }
     </script>
 </body>
