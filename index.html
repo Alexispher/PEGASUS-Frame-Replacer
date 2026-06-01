@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PEGASUS - TACTICAL LOCK SYSTEM</title>
+    <meta name="google" content="notranslate">
+    <title>PEGASUS - TACTICAL SNAPSHOT LOCK</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
@@ -15,6 +16,7 @@
             color: #fff;
             font-family: Consolas, monospace;
             overflow: hidden;
+            user-select: none;
         }
 
         #app {
@@ -27,7 +29,7 @@
 
         #terminal {
             height: 42vh;
-            padding: 16px;
+            padding: 14px;
             box-sizing: border-box;
             overflow-y: auto;
             border-bottom: 1px solid #333;
@@ -39,13 +41,19 @@
             line-height: 1;
             white-space: pre;
             color: #fff;
-            margin: 0 0 12px 0;
+            margin: 0 0 10px 0;
+        }
+
+        .menu {
+            font-size: 0.82rem;
+            color: #ccc;
+            line-height: 1.5;
         }
 
         #logs {
-            margin: 12px 0;
+            margin: 10px 0;
             color: #00ff66;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             line-height: 1.4;
         }
 
@@ -55,6 +63,7 @@
             gap: 6px;
             color: #fff;
             font-size: 0.95rem;
+            margin-top: 8px;
         }
 
         #cmd-input {
@@ -68,12 +77,59 @@
             caret-color: #fff;
         }
 
+        #snapshot-panel {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 10px;
+            border: 1px solid #333;
+            padding: 8px;
+            width: fit-content;
+            background: #050505;
+        }
+
+        #snapshot-info {
+            min-width: 140px;
+        }
+
+        #snapshot-title {
+            color: #00ff66;
+            font-size: 0.72rem;
+            margin-bottom: 6px;
+        }
+
+        #snapshot-meta {
+            color: #aaa;
+            font-size: 0.7rem;
+            line-height: 1.4;
+        }
+
+        #snapshot-canvas {
+            width: 140px;
+            height: 100px;
+            background: #000;
+            border: 1px solid #555;
+        }
+
         #camera-panel {
             position: relative;
             height: 58vh;
             width: 100vw;
             background: #050505;
             overflow: hidden;
+        }
+
+        #camera-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         #camera-container {
@@ -105,19 +161,6 @@
             pointer-events: none;
         }
 
-        #camera-placeholder {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #555;
-            font-size: 0.9rem;
-            text-align: center;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-
         #targeting-box {
             position: absolute;
             top: 50%;
@@ -130,6 +173,30 @@
             display: none;
             pointer-events: auto;
             box-sizing: border-box;
+            cursor: crosshair;
+        }
+
+        #targeting-box::before,
+        #targeting-box::after {
+            content: "";
+            position: absolute;
+            background: #ff3333;
+        }
+
+        #targeting-box::before {
+            width: 30px;
+            height: 1px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #targeting-box::after {
+            width: 1px;
+            height: 30px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
 
         #target-status {
@@ -148,14 +215,13 @@
             border-color: #00ff00 !important;
         }
 
-        .aligned #target-status {
-            color: #00ff00 !important;
+        .aligned::before,
+        .aligned::after {
+            background: #00ff00 !important;
         }
 
-        .menu {
-            font-size: 0.85rem;
-            color: #ccc;
-            line-height: 1.5;
+        .aligned #target-status {
+            color: #00ff00 !important;
         }
     </style>
 </head>
@@ -164,20 +230,19 @@
     <div id="app">
 
         <div id="terminal" onclick="focusInput()">
-        <pre class="ascii-banner">
-8b,dPPYba,   ,adPPYba,  ,adPPYb,d8 ,adPPYYba, ,adPPYba, 88       88 ,adPPYba,  
-88P'    "8a a8P_____88 a8"    `Y88 ""     `Y8 I8[    "" 88       88 I8[    ""  
-88       d8 8PP""""""" 8b       88 ,adPPPPP88  `"Y8ba,  88       88  `"Y8ba,   
-88b,   ,a8" "8b,   ,aa "8a,   ,d88 88,    ,88 aa    ]8I "8a,   ,a88 aa    ]8I  
-88`YbbdP"'   `"Ybbd8"'  `"YbbdP"Y8 `"8bbdP"Y8 `"YbbdP"'  `"YbbdP'Y8 `"YbbdP"'  
-88                      aa,    ,88                                             
-88                       "Y8bbdP"       
-        </pre>
+            <pre class="ascii-banner">
+  _____  ______ _____  _______  _    _  _____ 
+ |  __ \|  ____/ ____|/ /_   _|| |  | |/ ____|
+ | |__) | |__ | |  __ / /_ | |  | |  | | (___  
+ |  ___/|  __|| | |_ | '_ \| |  | |  | |\___ \ 
+ | |    | |___| |__| | (_) | |  | |__| |____) |
+ |_|    |______\_____|\___/___|  \____/|_____/ 
+            </pre>
 
             <div class="menu">
                 [1] ENGAGE OPTICAL CORE<br>
                 [0] RESET SYSTEM<br>
-                TAP RETICLE TO LOCK OBJECT
+                TAP RETICLE TO CAPTURE TARGET SNAPSHOT
             </div>
 
             <div id="logs">C:\PEGASUS&gt; AWAITING OPTICAL INPUT. TYPE [1] TO START.</div>
@@ -192,6 +257,19 @@
                     autofocus 
                     autocomplete="off"
                 >
+            </div>
+
+            <div id="snapshot-panel">
+                <canvas id="snapshot-canvas"></canvas>
+
+                <div id="snapshot-info">
+                    <div id="snapshot-title">TARGET SNAPSHOT: EMPTY</div>
+                    <div id="snapshot-meta">
+                        OBJECT: NONE<br>
+                        STATUS: NO FRAME<br>
+                        LOCK: OFFLINE
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -220,10 +298,20 @@
 
         const cameraContainer = document.getElementById("camera-container");
         const cameraPlaceholder = document.getElementById("camera-placeholder");
+
         const targetingBox = document.getElementById("targeting-box");
         const targetStatus = document.getElementById("target-status");
+
         const logs = document.getElementById("logs");
         const cmdInput = document.getElementById("cmd-input");
+
+        const snapshotCanvas = document.getElementById("snapshot-canvas");
+        const snapshotCtx = snapshotCanvas.getContext("2d");
+        const snapshotTitle = document.getElementById("snapshot-title");
+        const snapshotMeta = document.getElementById("snapshot-meta");
+
+        snapshotCanvas.width = 180;
+        snapshotCanvas.height = 120;
 
         let stream = null;
         let detectionModel = null;
@@ -231,6 +319,7 @@
         let detectionLoopStarted = false;
 
         let lockedObject = null;
+        let targetSnapshot = null;
         let lastPredictions = [];
         let lastDetectionTime = 0;
 
@@ -293,9 +382,9 @@
                         detectionModel = await cocoSsd.load();
                     }
 
-                    logMsg("OPTICAL CORE ONLINE. OBJECT DETECTION ACTIVE.");
-
                     detecting = true;
+
+                    logMsg("OPTICAL CORE ONLINE. OBJECT DETECTION ACTIVE.");
 
                     if (!detectionLoopStarted) {
                         detectionLoopStarted = true;
@@ -413,13 +502,21 @@
 
             if (target) {
                 lockedObject = {
-                    label: target.class
+                    label: target.class,
+                    score: target.score,
+                    bbox: target.bbox
                 };
+
+                captureTargetSnapshot(target);
 
                 targetingBox.classList.add("aligned");
                 targetStatus.innerText = "LOCKED: " + target.class.toUpperCase();
 
-                logMsg("SYSTEM LOCKED ON: " + target.class.toUpperCase());
+                logMsg(
+                    "SYSTEM LOCKED ON: " +
+                    target.class.toUpperCase() +
+                    " | SNAPSHOT CAPTURED"
+                );
 
                 if (navigator.vibrate) {
                     navigator.vibrate(100);
@@ -433,9 +530,56 @@
             }
         }
 
+        function captureTargetSnapshot(target) {
+            const cropWidth = 180;
+            const cropHeight = 140;
+
+            let sourceX = canvas.width / 2 - cropWidth / 2;
+            let sourceY = canvas.height / 2 - cropHeight / 2;
+
+            if (sourceX < 0) sourceX = 0;
+            if (sourceY < 0) sourceY = 0;
+
+            if (sourceX + cropWidth > canvas.width) {
+                sourceX = canvas.width - cropWidth;
+            }
+
+            if (sourceY + cropHeight > canvas.height) {
+                sourceY = canvas.height - cropHeight;
+            }
+
+            snapshotCtx.clearRect(0, 0, snapshotCanvas.width, snapshotCanvas.height);
+
+            snapshotCtx.drawImage(
+                video,
+                sourceX,
+                sourceY,
+                cropWidth,
+                cropHeight,
+                0,
+                0,
+                snapshotCanvas.width,
+                snapshotCanvas.height
+            );
+
+            snapshotCtx.strokeStyle = "#00ff00";
+            snapshotCtx.lineWidth = 3;
+            snapshotCtx.strokeRect(2, 2, snapshotCanvas.width - 4, snapshotCanvas.height - 4);
+
+            targetSnapshot = snapshotCanvas.toDataURL("image/png");
+
+            snapshotTitle.innerText = "TARGET SNAPSHOT: CAPTURED";
+
+            snapshotMeta.innerHTML =
+                "OBJECT: " + target.class.toUpperCase() + "<br>" +
+                "CONF: " + Math.round(target.score * 100) + "%<br>" +
+                "LOCK: ACTIVE";
+        }
+
         function resetSystem() {
             detecting = false;
             lockedObject = null;
+            targetSnapshot = null;
             lastPredictions = [];
 
             if (stream) {
@@ -447,6 +591,13 @@
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            snapshotCtx.clearRect(0, 0, snapshotCanvas.width, snapshotCanvas.height);
+
+            snapshotTitle.innerText = "TARGET SNAPSHOT: EMPTY";
+            snapshotMeta.innerHTML =
+                "OBJECT: NONE<br>" +
+                "STATUS: NO FRAME<br>" +
+                "LOCK: OFFLINE";
 
             setTimeout(function () {
                 window.location.reload();
