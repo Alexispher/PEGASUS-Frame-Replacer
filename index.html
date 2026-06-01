@@ -214,7 +214,7 @@
 
         <div class="cmd-line">
             <span class="prompt-text">C:\PEGASUS&gt;</span>
-            <input type="number" id="cmd-input" inputmode="numeric" onkeyup="checkInput(event)" autofocus autocomplete="off">
+            <input type="number" id="cmd-input" inputmode="numeric" oninput="checkInput(event)" autofocus autocomplete="off">
         </div>
     </div>
 
@@ -239,11 +239,14 @@
             cmdInput.focus();
         }
 
+        // Tactical instant input tracking (No Enter key required)
         function checkInput(event) {
-            if (event.key === 'Enter') {
-                runCommand(cmdInput.value);
-                cmdInput.value = '';
-            }
+            const val = cmdInput.value.trim();
+            
+            if (['0', '1', '2', '3'].includes(val)) {
+                runCommand(val);
+                cmdInput.value = ''; 
+            } 
         }
 
         function runCommand(cmd) {
@@ -252,7 +255,7 @@
                     startCamera();
                     break;
                 case '2':
-                    logMsg("CALIBRATING GYROSCOPIC TELEMETRY... STATUS: OPERACIONAL.");
+                    logMsg("CALIBRATING GYROSCOPIC TELEMETRY... STATUS: OPERATIONAL.");
                     break;
                 case '3':
                     logMsg("INFRA LATENCY: 12ms. NETWORK LINK SECURE.");
@@ -269,7 +272,6 @@
         async function startCamera() {
             logMsg("INITIALIZING BACK OPTICAL CAPTURE PIPELINE...");
             try {
-                // Direct user gesture interaction for iOS deployment
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment" } 
                 });
@@ -374,11 +376,14 @@
                 localStorage.clear();
                 sessionStorage.clear();
 
+                // Properly handling IndexedDB database deletion requests natively
                 if (window.indexedDB && indexedDB.databases) {
                     const databases = await indexedDB.databases();
+
                     await Promise.all(
                         databases.map(db => {
                             if (!db.name) return Promise.resolve();
+
                             return new Promise((resolve) => {
                                 const request = indexedDB.deleteDatabase(db.name);
                                 request.onsuccess = resolve;
