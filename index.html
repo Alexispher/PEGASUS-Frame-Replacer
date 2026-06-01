@@ -1,7 +1,8 @@
-<html lang="en" translate="no"><head>
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="google" content="notranslate">
     <title>PEGASUS - TACTICAL LOCK SYSTEM</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -12,55 +13,25 @@
             margin: 0;
             background: #000;
             color: #fff;
-            font-family: Consolas, "Lucida Console", monospace;
+            font-family: Consolas, monospace;
             overflow: hidden;
-            user-select: none;
         }
 
-        #camera-container {
-            position: fixed;
-            inset: 0;
+        #app {
             width: 100vw;
             height: 100vh;
-            z-index: 1;
-            display: none;
+            display: flex;
+            flex-direction: column;
             background: #000;
-        }
-
-        video,
-        #detection-canvas {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain; /* keeps AI boxes aligned with the camera frame */
-            background: #000;
-        }
-
-        video {
-            z-index: 1;
-        }
-
-        #detection-canvas {
-            z-index: 2;
-            pointer-events: none;
         }
 
         #terminal {
-            position: absolute;
-            inset: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 3;
-            padding: 18px;
+            height: 42vh;
+            padding: 16px;
             box-sizing: border-box;
-            background: #000;
-            transition: background 0.25s ease;
             overflow-y: auto;
-        }
-
-        .camera-active-mode {
-            background: rgba(0, 0, 0, 0.12) !important;
+            border-bottom: 1px solid #333;
+            background: #000;
         }
 
         .ascii-banner {
@@ -68,32 +39,83 @@
             line-height: 1;
             white-space: pre;
             color: #fff;
-            margin: 0 0 18px 0;
+            margin: 0 0 12px 0;
         }
 
         #logs {
-            margin: 14px 0;
+            margin: 12px 0;
             color: #00ff66;
-            font-size: 0.86rem;
-            min-height: 18px;
+            font-size: 0.9rem;
+            line-height: 1.4;
         }
 
         .cmd-line {
             display: flex;
-            gap: 4px;
             align-items: center;
+            gap: 6px;
+            color: #fff;
             font-size: 0.95rem;
         }
 
         #cmd-input {
+            flex: 1;
             background: transparent;
             border: none;
             outline: none;
             color: #fff;
-            font-family: inherit;
-            font-size: 0.95rem;
-            width: 80px;
+            font-family: Consolas, monospace;
+            font-size: 1rem;
             caret-color: #fff;
+        }
+
+        #camera-panel {
+            position: relative;
+            height: 58vh;
+            width: 100vw;
+            background: #050505;
+            overflow: hidden;
+        }
+
+        #camera-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: none;
+            background: #000;
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+            z-index: 1;
+        }
+
+        #detection-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        #camera-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         #targeting-box {
@@ -112,64 +134,37 @@
 
         #target-status {
             position: absolute;
-            top: -31px;
+            top: -32px;
             left: 0;
             color: #ff3333;
             font-weight: bold;
-            font-size: 0.74rem;
+            font-size: 0.75rem;
             background: #000;
             padding: 4px 6px;
             white-space: nowrap;
         }
 
         .aligned {
-            border-color: #00ff66 !important;
-            box-shadow: 0 0 12px rgba(0, 255, 102, 0.45);
+            border-color: #00ff00 !important;
         }
 
         .aligned #target-status {
-            color: #00ff66 !important;
+            color: #00ff00 !important;
+        }
+
+        .menu {
+            font-size: 0.85rem;
+            color: #ccc;
+            line-height: 1.5;
         }
     </style>
 </head>
 
 <body>
-    <div id="camera-container">
-        <video id="video" autoplay="" playsinline="" muted=""></video>
-        <canvas id="detection-canvas"></canvas>
-    </div>
+    <div id="app">
 
-    <div id="targeting-box" onclick="lockTarget()">
-        <div id="target-status">RETICLE: SEARCHING...</div>
-    </div>
-
-    <div id="terminal" onclick="focusInput()">
-           <pre class="ascii-banner">
-                                    ,
-                                   |`\
-                                  /'_/_
-                                ,'_/\_/\_                       ,
-                              ,'_/\'_\_,/_                    ,'|
-                            ,'_/\_'_ \_ \_/                _,-'_/
-                          ,'_/'\_'_ \_ \'_,\           _,-'_,-/ \,
-                        ,' /_\ _'_ \_ \'_,/       __,-'<_,' _,\_,/
-                       ( (' )\/(_ \_ \'_,\   __--' _,-_/_,-',_/ _\
-                        \_`\> 6` 7  \'_,/ ,-' _,-,'\,_'_ \,_/'_,\
-                          \/-  _/ 7 '/ _,' _/'\_  \,_'_ \_ \'_,/
-                           \_'/>   7'_/' _/' \_ '\,_'_ \_ \'_,\
-                             >/  _ ,V  ,<  \__ '\,_'_ \_ \'_,/
-                           /'_  ( )_)\/-,',__ '\,_'_,\_,\'_\
-                          ( ) \_ \|_  `\_    \_,/'\,_'_,/'
-                           \\_  \_\_)    `\_
-                            \_)   >        `\_
-                                 /  `,      |`\_
-                                /    \     / \ `\
-                               /   __/|   /  /  `\
-                              (`  (   (` (_  \   /
-                              /  ,/    |  /  /   \
-                             / ,/      | /   \   `\_
-                           _/_/        |/    /__/,_/     PEGASUS FRAME PLACER
-                          /_(         /_(
+        <div id="terminal" onclick="focusInput()">
+        <pre class="ascii-banner">
 8b,dPPYba,   ,adPPYba,  ,adPPYb,d8 ,adPPYYba, ,adPPYba, 88       88 ,adPPYba,  
 88P'    "8a a8P_____88 a8"    `Y88 ""     `Y8 I8[    "" 88       88 I8[    ""  
 88       d8 8PP""""""" 8b       88 ,adPPPPP88  `"Y8ba,  88       88  `"Y8ba,   
@@ -177,26 +172,54 @@
 88`YbbdP"'   `"Ybbd8"'  `"YbbdP"Y8 `"8bbdP"Y8 `"YbbdP"'  `"YbbdP'Y8 `"YbbdP"'  
 88                      aa,    ,88                                             
 88                       "Y8bbdP"       
-
         </pre>
 
-        <div>Type [1] to ENGAGE OPTICAL CORE</div>
-        <div>Type [0] to RESET LOCAL SYSTEM</div>
+            <div class="menu">
+                [1] ENGAGE OPTICAL CORE<br>
+                [0] RESET SYSTEM<br>
+                TAP RETICLE TO LOCK OBJECT
+            </div>
 
-        <div id="logs">C:\PEGASUS&gt; CRITICAL ERROR: CAMERA ACCESS DENIED OR UNAVAILABLE.</div>
+            <div id="logs">C:\PEGASUS&gt; AWAITING OPTICAL INPUT. TYPE [1] TO START.</div>
 
-        <div class="cmd-line">
-            <span>C:\PEGASUS&gt;</span>
-            <input type="number" id="cmd-input" inputmode="numeric" oninput="checkInput(event)" autofocus="" autocomplete="off">
+            <div class="cmd-line">
+                <span>C:\PEGASUS&gt;</span>
+                <input 
+                    type="number" 
+                    id="cmd-input" 
+                    inputmode="numeric" 
+                    oninput="checkInput(event)" 
+                    autofocus 
+                    autocomplete="off"
+                >
+            </div>
         </div>
+
+        <div id="camera-panel">
+            <div id="camera-placeholder">
+                CAMERA FEED OFFLINE<br>
+                TYPE [1] TO INITIALIZE OPTICAL MODULE
+            </div>
+
+            <div id="camera-container">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="detection-canvas"></canvas>
+
+                <div id="targeting-box" onclick="lockTarget()">
+                    <div id="target-status">RETICLE: SEARCHING...</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
         const video = document.getElementById("video");
-        const cameraContainer = document.getElementById("camera-container");
         const canvas = document.getElementById("detection-canvas");
         const ctx = canvas.getContext("2d");
-        const terminal = document.getElementById("terminal");
+
+        const cameraContainer = document.getElementById("camera-container");
+        const cameraPlaceholder = document.getElementById("camera-placeholder");
         const targetingBox = document.getElementById("targeting-box");
         const targetStatus = document.getElementById("target-status");
         const logs = document.getElementById("logs");
@@ -205,13 +228,14 @@
         let stream = null;
         let detectionModel = null;
         let detecting = false;
+        let detectionLoopStarted = false;
+
         let lockedObject = null;
-
-        let lastDetectionTime = 0;
-        const detectionInterval = 600;
-
         let lastPredictions = [];
-        let loopStarted = false;
+        let lastDetectionTime = 0;
+
+        const detectionInterval = 600;
+        const confidenceLimit = 0.50;
 
         function focusInput() {
             cmdInput.focus();
@@ -225,25 +249,25 @@
             const value = event.target.value.trim();
 
             if (value === "1") {
-                startCamera();
                 event.target.value = "";
+                startCamera();
             }
 
             if (value === "0") {
-                resetLocalSystem();
                 event.target.value = "";
+                resetSystem();
             }
         }
 
         async function startCamera() {
             if (detecting) {
-                logMsg("OPTICAL CORE ALREADY ACTIVE.");
+                logMsg("OPTICAL CORE ALREADY ONLINE.");
                 return;
             }
 
-            try {
-                logMsg("INITIALIZING OPTICAL PIPELINE...");
+            logMsg("INITIALIZING OPTICAL PIPELINE...");
 
+            try {
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: "environment",
@@ -255,27 +279,30 @@
 
                 video.srcObject = stream;
 
-                video.onloadedmetadata = async () => {
+                video.onloadedmetadata = async function () {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
 
+                    cameraPlaceholder.style.display = "none";
                     cameraContainer.style.display = "block";
-                    terminal.classList.add("camera-active-mode");
                     targetingBox.style.display = "block";
 
+                    logMsg("LOADING COCO-SSD NEURAL MODEL...");
+
                     if (!detectionModel) {
-                        logMsg("LOADING COCO-SSD OBJECT DETECTION MODEL...");
                         detectionModel = await cocoSsd.load();
                     }
 
-                    detecting = true;
-                    logMsg("OPTICAL CORE ONLINE. CENTER OBJECT AND TAP RETICLE TO LOCK.");
+                    logMsg("OPTICAL CORE ONLINE. OBJECT DETECTION ACTIVE.");
 
-                    if (!loopStarted) {
-                        loopStarted = true;
+                    detecting = true;
+
+                    if (!detectionLoopStarted) {
+                        detectionLoopStarted = true;
                         detectObjects();
                     }
                 };
+
             } catch (error) {
                 console.error(error);
                 logMsg("CRITICAL ERROR: CAMERA ACCESS DENIED OR UNAVAILABLE.");
@@ -284,109 +311,103 @@
 
         async function detectObjects() {
             if (!detecting || !detectionModel) {
-                loopStarted = false;
+                requestAnimationFrame(detectObjects);
                 return;
             }
 
             const now = Date.now();
 
-            if (now - lastDetectionTime >= detectionInterval) {
-                lastDetectionTime = now;
+            if (now - lastDetectionTime < detectionInterval) {
+                requestAnimationFrame(detectObjects);
+                return;
+            }
 
-                const predictions = await detectionModel.detect(video);
-                lastPredictions = predictions.filter(prediction => prediction.score >= 0.50);
+            lastDetectionTime = now;
 
-                drawPredictions(lastPredictions);
-                updateLockStatus(lastPredictions);
+            const predictions = await detectionModel.detect(video);
+
+            lastPredictions = predictions.filter(function (p) {
+                return p.score >= confidenceLimit;
+            });
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let lockedFound = false;
+
+            lastPredictions.forEach(function (p) {
+                if (lockedObject && p.class !== lockedObject.label) {
+                    return;
+                }
+
+                const x = p.bbox[0];
+                const y = p.bbox[1];
+                const w = p.bbox[2];
+                const h = p.bbox[3];
+
+                const objectCenterX = x + w / 2;
+                const objectCenterY = y + h / 2;
+
+                const canvasCenterX = canvas.width / 2;
+                const canvasCenterY = canvas.height / 2;
+
+                const isAligned =
+                    Math.abs(objectCenterX - canvasCenterX) < 80 &&
+                    Math.abs(objectCenterY - canvasCenterY) < 80;
+
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = lockedObject ? "#00ff00" : "#ffffff";
+                ctx.strokeRect(x, y, w, h);
+
+                ctx.fillStyle = lockedObject ? "#00ff00" : "#ffffff";
+                ctx.font = "14px Consolas";
+
+                const labelText =
+                    p.class.toUpperCase() + " " + Math.round(p.score * 100) + "%";
+
+                ctx.fillText(labelText, x, y > 18 ? y - 5 : y + 18);
+
+                if (lockedObject) {
+                    lockedFound = true;
+
+                    if (isAligned) {
+                        targetingBox.classList.add("aligned");
+                        targetStatus.innerText = "LOCKED: " + lockedObject.label.toUpperCase();
+                    } else {
+                        targetingBox.classList.remove("aligned");
+                        targetStatus.innerText = "TRACKING: " + lockedObject.label.toUpperCase();
+                    }
+                }
+            });
+
+            if (lockedObject && !lockedFound) {
+                targetingBox.classList.remove("aligned");
+                targetStatus.innerText = "TARGET LOST";
             }
 
             requestAnimationFrame(detectObjects);
         }
 
-        function drawPredictions(predictions) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            predictions.forEach(prediction => {
-                if (lockedObject && prediction.class !== lockedObject.label) {
-                    return;
-                }
-
-                const [x, y, width, height] = prediction.bbox;
-                const score = Math.round(prediction.score * 100);
-
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = lockedObject ? "#00ff66" : "#ffffff";
-                ctx.strokeRect(x, y, width, height);
-
-                ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                ctx.fillRect(x, y > 24 ? y - 24 : y, 190, 22);
-
-                ctx.fillStyle = lockedObject ? "#00ff66" : "#ffffff";
-                ctx.font = "14px Consolas";
-                ctx.fillText(`${prediction.class.toUpperCase()} ${score}%`, x + 5, y > 24 ? y - 8 : y + 16);
-            });
-        }
-
-        function updateLockStatus(predictions) {
-            if (!lockedObject) {
-                targetingBox.classList.remove("aligned");
-                targetStatus.innerText = "RETICLE: SEARCHING...";
-                return;
-            }
-
-            const candidates = predictions.filter(prediction => prediction.class === lockedObject.label);
-
-            if (candidates.length === 0) {
-                targetingBox.classList.remove("aligned");
-                targetStatus.innerText = "TARGET LOST: " + lockedObject.label.toUpperCase();
-                return;
-            }
-
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-
-            let best = null;
-            let bestDistance = Infinity;
-
-            candidates.forEach(prediction => {
-                const [x, y, width, height] = prediction.bbox;
-                const objectX = x + width / 2;
-                const objectY = y + height / 2;
-                const distance = Math.hypot(objectX - centerX, objectY - centerY);
-
-                if (distance < bestDistance) {
-                    best = prediction;
-                    bestDistance = distance;
-                }
-            });
-
-            if (bestDistance <= 90) {
-                targetingBox.classList.add("aligned");
-                targetStatus.innerText = "LOCKED: " + lockedObject.label.toUpperCase();
-            } else {
-                targetingBox.classList.remove("aligned");
-                targetStatus.innerText = "TRACKING: " + lockedObject.label.toUpperCase();
-            }
-        }
-
         function lockTarget() {
-            if (!detecting || !detectionModel) {
-                logMsg("OPTICAL CORE IS OFFLINE. TYPE [1] FIRST.");
+            if (!detecting || lastPredictions.length === 0) {
+                logMsg("NO OBJECT DATA AVAILABLE FOR LOCK.");
+                targetStatus.innerText = "RETICLE: NO DATA";
                 return;
             }
 
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
 
-            const target = lastPredictions.find(prediction => {
-                const [x, y, width, height] = prediction.bbox;
+            const target = lastPredictions.find(function (p) {
+                const x = p.bbox[0];
+                const y = p.bbox[1];
+                const w = p.bbox[2];
+                const h = p.bbox[3];
 
                 return (
-                    prediction.score >= 0.50 &&
                     centerX >= x &&
-                    centerX <= x + width &&
+                    centerX <= x + w &&
                     centerY >= y &&
-                    centerY <= y + height
+                    centerY <= y + h
                 );
             });
 
@@ -397,11 +418,13 @@
 
                 targetingBox.classList.add("aligned");
                 targetStatus.innerText = "LOCKED: " + target.class.toUpperCase();
+
                 logMsg("SYSTEM LOCKED ON: " + target.class.toUpperCase());
 
                 if (navigator.vibrate) {
                     navigator.vibrate(100);
                 }
+
             } else {
                 lockedObject = null;
                 targetingBox.classList.remove("aligned");
@@ -410,21 +433,25 @@
             }
         }
 
-        function resetLocalSystem() {
+        function resetSystem() {
             detecting = false;
-            loopStarted = false;
             lockedObject = null;
             lastPredictions = [];
 
             if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+                stream.getTracks().forEach(function (track) {
+                    track.stop();
+                });
+
                 stream = null;
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            window.location.reload();
+
+            setTimeout(function () {
+                window.location.reload();
+            }, 300);
         }
     </script>
-
-
-</body></html>
+</body>
+</html>
