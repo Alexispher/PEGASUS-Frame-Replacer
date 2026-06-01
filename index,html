@@ -1,82 +1,381 @@
-from flask import Flask, render_template_string, redirect, url_for, session, flash
-from functools import wraps
-from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired
-
-app = Flask(__name__)
-app.secret_key = 'chave-secreta'
-# Requisito para o CSRF funcionar com o Flask-WTF
-app.config['WTF_CSRF_SECRET_KEY'] = 'chave-csrf'
-
-# Formulário com proteção CSRF embutida
-class LoginForm(FlaskForm):
-    usuario = StringField('Usuário', validators=[DataRequired()])
-    senha = PasswordField('Senha', validators=[DataRequired()])
-    submit = SubmitField('Entrar')
-
-# Usuários simulados
-USUARIOS = {
-    'admin': {'senha': '123'},
-    'joao': {'senha': '456'}
-}
-
-# Decorator para proteger a rota
-def login_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if 'usuario' not in session:
-            flash("Login necessário.", "erro")
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return wrapper
-
-@app.route('/')
-def index():
-    return '<h2>Bem-vindo!</h2><a href="/login">Fazer Login</a> | <a href="/painel">Painel Protegido</a>'
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        usuario = form.usuario.data
-        senha = form.senha.data
-        if usuario in USUARIOS and USUARIOS[usuario]['senha'] == senha:
-            session['usuario'] = usuario
-            return redirect(url_for('painel'))
-        else:
-            flash("Credenciais inválidas.", "erro")
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PEGASUS FRAME PLACER - AI TERMINAL</title>
     
-    # HTML do login
-    html = '''
-    <h2>Login (Protegido contra CSRF)</h2>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}<p style="color: red;">{{ message }}</p>{% endfor %}
-    {% endwith %}
-    <form method="POST">
-      {{ form.hidden_tag() }}
-      <p>{{ form.usuario.label }} {{ form.usuario() }}</p>
-      <p>{{ form.senha.label }} {{ form.senha() }}</p>
-      <p>{{ form.submit() }}</p>
-    </form>
-    '''
-    return render_template_string(html, form=form)
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
-@app.route('/painel')
-@login_required
-def painel():
-    html = '''
-    <h2>Área Protegida VIP</h2>
-    <p>Fala, {{ usuario }}! O sistema tá seguro.</p>
-    <a href="/logout">Sair</a>
-    '''
-    return render_template_string(html, usuario=session['usuario'])
+    <style>
+        /* Terminal & Camera Engine Viewport */
+        body { 
+            margin: 0; 
+            background-color: #000510; 
+            color: #4da6ff; 
+            font-family: 'Courier New', Courier, monospace; 
+            overflow: hidden; 
+            user-select: none;
+        }
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash("Você saiu do sistema.", "info")
-    return redirect(url_for('index'))
+        /* Video Container Viewport Mapping */
+        #camera-container { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100vw; height: 100vh; 
+            z-index: 1; 
+            display: none; 
+            background-color: #000;
+        }
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+        /* Contain rendering to map precise AI coordinates on iPhone display */
+        video, #detection-canvas { 
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%; 
+            object-fit: contain; 
+            background: #000;
+        }
+        video { z-index: 1; }
+        #detection-canvas { z-index: 2; pointer-events: none; }
+
+        /* Overlay Terminal HUD Interface */
+        #terminal { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100vw; height: 100vh; 
+            z-index: 3; 
+            padding: 20px; 
+            box-sizing: border-box; 
+            background: rgba(0, 5, 16, 0.85); 
+            transition: background 0.5s;
+        }
+        
+        /* Translucent HUD mode when tactical camera optics are active */
+        .camera-active-mode {
+            background: rgba(0, 5, 16, 0.25) !important;
+            text-shadow: 1px 1px 3px #000;
+        }
+
+        h1 { 
+            color: #ffffff; 
+            text-shadow: 0 0 8px #4da6ff; 
+            font-size: 1.6rem;
+            border-bottom: 2px solid #4da6ff;
+            padding-bottom: 10px;
+            margin-top: 10px;
+        }
+
+        .menu { margin-top: 25px; }
+        .menu-item { 
+            margin: 12px 0; 
+            font-size: 1.1rem; 
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .menu-item:hover, .menu-item:active { 
+            color: #ffffff; 
+            background-color: #004080; 
+            display: inline-block;
+            padding: 2px 5px;
+        }
+
+        /* Terminal Command Input */
+        .cmd-line { margin-top: 25px; font-size: 1.1rem; color: #ffffff; }
+        #cmd-input { 
+            background: transparent; 
+            border: none; 
+            color: #ffffff; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 1.1rem; 
+            outline: none; 
+            width: 40px; 
+            border-bottom: 2px solid #4da6ff;
+            text-align: center;
+        }
+
+        /* Central Manual Targeting Overlay (Reticle Frame) */
+        #targeting-box { 
+            position: absolute; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            width: 240px; height: 240px; 
+            border: 3px solid #ff3333; 
+            z-index: 4; 
+            display: none; 
+            transition: all 0.2s ease-out; 
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.4) inset;
+        }
+
+        /* Tactical Target Frame HUD Status Text */
+        #target-status {
+            position: absolute;
+            top: -30px; left: 0;
+            color: #ff3333;
+            font-weight: bold;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            background: rgba(0,0,0,0.5);
+            padding: 2px 5px;
+        }
+
+        /* Visual State Modification: Target Locked (Green Alignment) */
+        .aligned { 
+            border-color: #00ff00 !important; 
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5) inset !important; 
+            transform: translate(-50%, -50%) scale(0.95) !important;
+        }
+        .aligned #target-status { 
+            color: #00ff00 !important; 
+        }
+
+        #logs { 
+            margin-top: 15px; 
+            font-size: 0.85rem; 
+            color: #88ccee; 
+            min-height: 40px;
+            line-height: 1.4;
+            background: rgba(0, 10, 30, 0.6);
+            padding: 8px;
+            border-left: 3px solid #4da6ff;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="camera-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="detection-canvas"></canvas>
+    </div>
+
+    <div id="targeting-box" onclick="toggleAlignment()">
+        <div id="target-status">RETICLE: SEARCHING...</div>
+    </div>
+
+    <div id="terminal">
+        <h1>> PEGASUS FRAME PLACER_</h1>
+        <div id="logs">SYSTEM ONLINE. AWAITING PARAMS.</div>
+        
+        <div class="menu">
+            <div class="menu-item" onclick="runCommand('1')">[1] ENGAGE OPTICAL CORE MODULE (AI)</div>
+            <div class="menu-item" onclick="runCommand('2')">[2] CALIBRATE TELEMETRY SENSORES</div>
+            <div class="menu-item" onclick="runCommand('3')">[3] NETWORK INTERFACE DIAGNOSTICS</div>
+            <div class="menu-item" style="color: #ff6666;" onclick="runCommand('0')">[0] SYSTEM PURGE (LOCAL APPLICATION RESET)</div>
+        </div>
+
+        <div class="cmd-line">
+            <span>>_ CMD: </span>
+            <input type="number" id="cmd-input" inputmode="numeric" onkeyup="checkInput(event)">
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const cameraContainer = document.getElementById('camera-container');
+        const canvas = document.getElementById('detection-canvas');
+        const ctx = canvas.getContext('2d');
+        const terminal = document.getElementById('terminal');
+        const targetingBox = document.getElementById('targeting-box');
+        const targetStatus = document.getElementById('target-status');
+        const logs = document.getElementById('logs');
+        
+        let stream = null;
+        let detectionModel = null;
+        let detecting = false;
+        let lastLogTime = 0;
+
+        function checkInput(event) {
+            if (event.key === 'Enter') {
+                runCommand(event.target.value);
+                event.target.value = '';
+            }
+        }
+
+        function runCommand(cmd) {
+            switch(cmd) {
+                case '1':
+                    startCamera();
+                    break;
+                case '2':
+                    logMsg("CALIBRATING GYROSCOPIC TELEMETRY... STATUS: OPERATIONAL.");
+                    break;
+                case '3':
+                    logMsg("INFRA LATENCY: 12ms. NETWORK LINK SECURE.");
+                    break;
+                case '0':
+                    resetLocalApplication();
+                    break;
+                default:
+                    logMsg("INVALID COMMAND REQUEST. RE-ENTER PARAMETERS.");
+            }
+        }
+
+        // 1. Initialize Back-Facing Camera Module and Bootstrap AI Model
+        async function startCamera() {
+            logMsg("INITIALIZING BACK OPTICAL CAPTURE PIPELINE...");
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = async () => {
+                    // Synchronize processing canvas resolution to raw video width/height
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+
+                    cameraContainer.style.display = 'block';
+                    terminal.classList.add('camera-active-mode');
+                    targetingBox.style.display = 'block';
+                    
+                    logMsg("DOWNLOADING COCO-SSD NEURAL NET WEIGHTS...");
+                    
+                    if (!detectionModel) {
+                        detectionModel = await cocoSsd.load();
+                    }
+                    
+                    logMsg("OPTICAL COMPUTER VISION ONLINE. SCANNING PERIMETER...");
+                    detecting = true;
+                    detectObjects();
+                };
+                
+            } catch (err) {
+                logMsg("CRITICAL ERROR: OPTICAL ACCESS PERMISSION DENIED.");
+                console.error(err);
+            }
+        }
+
+        // Live Processing Loop for Frame Object Identification
+        async function detectObjects() {
+            if (!detecting || !detectionModel) return;
+
+            // Extract object tracking vector predictions from mobile viewport
+            const predictions = await detectionModel.detect(video);
+
+            // Wipe drawing canvas from historical frames
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let highestConfidencePred = null;
+
+            predictions.forEach(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+                const score = Math.round(prediction.score * 100);
+
+                // Noise reduction gate (ignore low confidence tracking matrices)
+                if (score < 55) return;
+
+                if (!highestConfidencePred || prediction.score > highestConfidencePred.score) {
+                    highestConfidencePred = prediction;
+                }
+
+                // Render bounding box matrices to processing viewport
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = "#4da6ff"; 
+                ctx.strokeRect(x, y, width, height);
+
+                // Render target vector identification background plates
+                ctx.fillStyle = "rgba(0, 5, 16, 0.6)";
+                ctx.fillRect(x, y > 30 ? y - 30 : y, width > 220 ? 220 : width, 30);
+
+                // Print classification tag data
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 16px 'Courier New', monospace";
+                ctx.fillText(`SCAN: ${prediction.class.toUpperCase()} [${score}%]`, x + 8, y > 30 ? y - 10 : y + 20);
+            });
+
+            // Automated tactical HUD telemetry logging routing
+            if (highestConfidencePred) {
+                const now = Date.now();
+                if (now - lastLogTime > 1500) { 
+                    const label = highestConfidencePred.class.toUpperCase();
+                    const conf = Math.round(highestConfidencePred.score * 100);
+                    logMsg(`OBJECT IDENTIFIED: ${label} | CONFIDENCE: ${conf}% | FRAME LOCK: STABLE`);
+                    lastLogTime = now;
+                }
+            }
+
+            // High performance animation frame request scheduling
+            requestAnimationFrame(detectObjects);
+        }
+
+        // Toggle Manual Alignment Mechanics (Trigger Lock)
+        function toggleAlignment() {
+            if (targetingBox.classList.contains('aligned')) {
+                targetingBox.classList.remove('aligned');
+                targetStatus.innerText = "RETICLE: SEARCHING...";
+            } else {
+                targetingBox.classList.add('aligned');
+                targetStatus.innerText = "TARGET LOCKED / ALIGNMENT STABLE";
+            }
+        }
+
+        // 0. Local Application Reset Procedure
+        async function resetLocalApplication() {
+            logMsg("EXECUTING LOCAL APPLICATION RESET PROCEDURE...");
+            detecting = false;
+
+            try {
+                // Kill video media streams immediately
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+
+                // Empty tracking canvases
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Purge application web storage vectors
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Explicitly await formal deletion response from local IndexedDB instances
+                if (window.indexedDB && indexedDB.databases) {
+                    const databases = await indexedDB.databases();
+                    await Promise.all(
+                        databases.map(db => {
+                            if (!db.name) return Promise.resolve();
+                            return new Promise((resolve) => {
+                                const request = indexedDB.deleteDatabase(db.name);
+                                request.onsuccess = resolve;
+                                request.onerror = resolve;
+                                request.onblocked = resolve;
+                            });
+                        })
+                    );
+                }
+
+                // Purge application cache namespaces
+                if ("caches" in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(
+                        cacheNames.map(cacheName => caches.delete(cacheName))
+                    );
+                }
+
+                // Unregister local progressive application service workers
+                if ("serviceWorker" in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(
+                        registrations.map(reg => reg.unregister())
+                    );
+                }
+
+                logMsg("LOCAL HARD RESET COMPLETED. EXECUTING SYSTEM COLD REBOOT...");
+
+                setTimeout(() => {
+                    window.location.reload();
+                }, 800);
+
+            } catch (error) {
+                console.error(error);
+                logMsg("CRITICAL ARTIFACT EXCEPTION ENCOUNTERED DURING APPMEM PURGE.");
+            }
+        }
+
+        function logMsg(msg) {
+            logs.innerText = "> " + msg;
+        }
+    </script>
+</body>
+</html>
