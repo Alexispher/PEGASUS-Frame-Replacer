@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" translate="no">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google" content="notranslate">
     <title>Command Prompt - PEGASUS FRAME PLACER</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -29,7 +30,7 @@
             background-color: #000000;
         }
 
-        /* Contain rendering to map precise AI coordinates on iPhone display */
+        /* Contain rendering to map precise AI coordinates on mobile display */
         video, #detection-canvas { 
             position: absolute;
             top: 0; left: 0;
@@ -63,7 +64,7 @@
         .ascii-banner {
             color: #ffffff;
             font-family: 'Consolas', 'Lucida Console', monospace;
-            font-size: 8px; /* Adjusted for mobile screens */
+            font-size: 8px; 
             line-height: 1.2;
             white-space: pre;
             margin: 15px 0;
@@ -105,7 +106,7 @@
             font-size: 1rem; 
             outline: none; 
             flex: 1;
-            caret-color: #ffffff; /* Classic white blinking cursor feel */
+            caret-color: #ffffff; 
         }
 
         /* Central Manual Targeting Overlay (Reticle Frame) */
@@ -203,6 +204,7 @@
 88                       "Y8bbdP"       
 
         </pre>
+
         <div class="menu">
             <div class="menu-item">Type [1] to ENGAGE OPTICAL CORE MODULE (AI)</div>
             <div class="menu-item">Type [2] to CALIBRATE TELEMETRY SENSORS</div>
@@ -212,9 +214,9 @@
 
         <div id="logs">C:\PEGASUS> Awaiting operational parameters...</div>
 
-        <div class="cmd-line">
+        <div class="cmd-line" onclick="triggerGesture()">
             <span class="prompt-text">C:\PEGASUS&gt;</span>
-            <input type="number" id="cmd-input" inputmode="numeric" oninput="checkInput(event)" autofocus autocomplete="off">
+            <input type="number" id="cmd-input" inputmode="numeric" oninput="checkInput(event)" autofocus autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other">
         </div>
     </div>
 
@@ -233,27 +235,31 @@
         let detectionModel = null;
         let detecting = false;
         let lastLogTime = 0;
+        let userGestureActived = false;
 
-        // Automatically focus input when clicking anywhere on the CMD terminal
         function focusInput() {
             cmdInput.focus();
         }
 
-        // Tactical instant input tracking (No Enter key required)
+        function triggerGesture() {
+            userGestureActived = true;
+        }
+
         function checkInput(event) {
-            const val = cmdInput.value.trim();
+            // O replace garante que espaços fantasmas do Android sejam destruídos
+            const val = cmdInput.value.replace(/\s+/g, '').trim();
             
-            if (['0', '1', '2', '3'].includes(val)) {
+            if (val === '1') {
+                startCamera();
+                cmdInput.value = '';
+            } else if (['0', '2', '3'].includes(val)) {
                 runCommand(val);
                 cmdInput.value = ''; 
-            } 
+            }
         }
 
         function runCommand(cmd) {
             switch(cmd) {
-                case '1':
-                    startCamera();
-                    break;
                 case '2':
                     logMsg("CALIBRATING GYROSCOPIC TELEMETRY... STATUS: OPERATIONAL.");
                     break;
@@ -268,13 +274,19 @@
             }
         }
 
-        // 1. Initialize Back-Facing Camera Module and Bootstrap AI Model
         async function startCamera() {
             logMsg("INITIALIZING BACK OPTICAL CAPTURE PIPELINE...");
             try {
+                // Acesso universal à câmera traseira (iPhone e Android)
                 stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
+                    video: { facingMode: { exact: "environment" } } 
+                }).catch(async (e) => {
+                    // Fallback de segurança se o Android não entender a exigência "exact"
+                    return await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: "environment" } 
+                    });
                 });
+                
                 video.srcObject = stream;
                 
                 video.onloadedmetadata = async () => {
@@ -302,7 +314,6 @@
             }
         }
 
-        // Live Processing Loop for Frame Object Identification
         async function detectObjects() {
             if (!detecting || !detectionModel) return;
 
@@ -321,16 +332,13 @@
                     highestConfidencePred = prediction;
                 }
 
-                // Render classic thin lines for CMD aesthetic bounding boxes
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = "#ffffff"; 
                 ctx.strokeRect(x, y, width, height);
 
-                // Text background plates
                 ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
                 ctx.fillRect(x, y > 25 ? y - 25 : y, width > 200 ? 200 : width, 24);
 
-                // Tag text execution
                 ctx.fillStyle = "#ffffff";
                 ctx.font = "14px 'Consolas', monospace";
                 ctx.fillText(`SCAN: ${prediction.class.toUpperCase()} [${score}%]`, x + 5, y > 25 ? y - 8 : y + 16);
@@ -349,7 +357,6 @@
             requestAnimationFrame(detectObjects);
         }
 
-        // Toggle Manual Alignment Mechanics (Trigger Lock)
         function toggleAlignment() {
             if (targetingBox.classList.contains('aligned')) {
                 targetingBox.classList.remove('aligned');
@@ -360,7 +367,6 @@
             }
         }
 
-        // 0. Local Application Reset Procedure
         async function resetLocalApplication() {
             logMsg("EXECUTING LOCAL APPLICATION RESET PROCEDURE...");
             detecting = false;
@@ -372,18 +378,14 @@
                 }
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-
                 localStorage.clear();
                 sessionStorage.clear();
 
-                // Properly handling IndexedDB database deletion requests natively
                 if (window.indexedDB && indexedDB.databases) {
                     const databases = await indexedDB.databases();
-
                     await Promise.all(
                         databases.map(db => {
                             if (!db.name) return Promise.resolve();
-
                             return new Promise((resolve) => {
                                 const request = indexedDB.deleteDatabase(db.name);
                                 request.onsuccess = resolve;
