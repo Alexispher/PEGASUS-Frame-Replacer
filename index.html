@@ -1,175 +1,150 @@
-<!DOCTYPE html>
-<html lang="en" translate="no">
-<head>
+<html lang="en" translate="no"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google" content="notranslate">
-    <title>Command Prompt - PEGASUS FRAME PLACER</title>
-    
+    <title>PEGASUS - TACTICAL LOCK SYSTEM</title>
+
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
     <style>
-        /* Classic Windows CMD Viewport */
-        body { 
-            margin: 0; 
-            background-color: #000000; 
-            color: #ffffff; 
-            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; 
-            overflow: hidden; 
+        body {
+            margin: 0;
+            background: #000;
+            color: #fff;
+            font-family: Consolas, "Lucida Console", monospace;
+            overflow: hidden;
             user-select: none;
         }
 
-        /* Video Container Viewport Mapping */
-        #camera-container { 
-            position: absolute; 
-            top: 0; left: 0; 
-            width: 100vw; height: 100vh; 
-            z-index: 1; 
-            display: none; 
-            background-color: #000000;
+        #camera-container {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            display: none;
+            background: #000;
         }
 
-        /* Contain rendering to map precise AI coordinates on mobile display */
-        video, #detection-canvas { 
+        video,
+        #detection-canvas {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%; 
-            object-fit: contain; 
-            background: #000000;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* keeps AI boxes aligned with the camera frame */
+            background: #000;
         }
-        video { z-index: 1; }
-        #detection-canvas { z-index: 2; pointer-events: none; }
 
-        /* Windows CMD Window Terminal Overlay */
-        #terminal { 
-            position: absolute; 
-            top: 0; left: 0; 
-            width: 100vw; height: 100vh; 
-            z-index: 3; 
-            padding: 15px; 
-            box-sizing: border-box; 
-            background: #000000; 
-            transition: background 0.3s;
+        video {
+            z-index: 1;
+        }
+
+        #detection-canvas {
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        #terminal {
+            position: absolute;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 3;
+            padding: 18px;
+            box-sizing: border-box;
+            background: #000;
+            transition: background 0.25s ease;
             overflow-y: auto;
         }
-        
-        /* Transparent CMD mode when camera optics are active */
+
         .camera-active-mode {
-            background: rgba(0, 0, 0, 0.70) !important;
-            text-shadow: 1px 1px 2px #000000;
+            background: rgba(0, 0, 0, 0.12) !important;
         }
 
-        /* Dedicated Space for your ASCII Art Banner */
         .ascii-banner {
-            color: #ffffff;
-            font-family: 'Consolas', 'Lucida Console', monospace;
-            font-size: 8px; 
-            line-height: 1.2;
+            font-size: 6px;
+            line-height: 1;
             white-space: pre;
-            margin: 15px 0;
-            display: block;
+            color: #fff;
+            margin: 0 0 18px 0;
         }
 
-        .cmd-header {
-            color: #cccccc;
-            margin-bottom: 15px;
+        #logs {
+            margin: 14px 0;
+            color: #00ff66;
+            font-size: 0.86rem;
+            min-height: 18px;
+        }
+
+        .cmd-line {
+            display: flex;
+            gap: 4px;
+            align-items: center;
             font-size: 0.95rem;
         }
 
-        .menu { margin: 20px 0; }
-        .menu-item { 
-            margin: 8px 0; 
-            font-size: 1rem;
-            color: #ffffff;
+        #cmd-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.95rem;
+            width: 80px;
+            caret-color: #fff;
         }
 
-        /* Classic CMD Prompt Line */
-        .cmd-line { 
-            margin-top: 20px; 
-            font-size: 1rem; 
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-        }
-        
-        .prompt-text {
-            color: #ffffff;
-            margin-right: 5px;
-        }
-
-        #cmd-input { 
-            background: transparent; 
-            border: none; 
-            color: #ffffff; 
-            font-family: 'Consolas', 'Lucida Console', monospace; 
-            font-size: 1rem; 
-            outline: none; 
-            flex: 1;
-            caret-color: #ffffff; 
+        #targeting-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 150px;
+            height: 150px;
+            transform: translate(-50%, -50%);
+            border: 2px solid #ff3333;
+            z-index: 4;
+            display: none;
+            pointer-events: auto;
+            box-sizing: border-box;
         }
 
-        /* Central Manual Targeting Overlay (Reticle Frame) */
-        #targeting-box { 
-            position: absolute; 
-            top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); 
-            width: 240px; height: 240px; 
-            border: 2px solid #ff3333; 
-            z-index: 4; 
-            display: none; 
-            transition: all 0.2s ease-out; 
-        }
-
-        /* Tactical Target Frame HUD Status Text */
         #target-status {
             position: absolute;
-            top: -25px; left: 0;
+            top: -31px;
+            left: 0;
             color: #ff3333;
             font-weight: bold;
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-            background: #000000;
-            padding: 2px 5px;
+            font-size: 0.74rem;
+            background: #000;
+            padding: 4px 6px;
+            white-space: nowrap;
         }
 
-        /* Target Locked State (Green Alignment) */
-        .aligned { 
-            border-color: #00ff00 !important; 
-        }
-        .aligned #target-status { 
-            color: #00ff00 !important; 
+        .aligned {
+            border-color: #00ff66 !important;
+            box-shadow: 0 0 12px rgba(0, 255, 102, 0.45);
         }
 
-        #logs { 
-            margin-top: 20px; 
-            font-size: 0.9rem; 
-            color: #ffffff; 
-            min-height: 30px;
-            line-height: 1.4;
-            border-top: 1px dashed #555555;
-            padding-top: 10px;
+        .aligned #target-status {
+            color: #00ff66 !important;
         }
     </style>
 </head>
-<body>
 
+<body>
     <div id="camera-container">
-        <video id="video" autoplay playsinline></video>
+        <video id="video" autoplay="" playsinline="" muted=""></video>
         <canvas id="detection-canvas"></canvas>
     </div>
 
-    <div id="targeting-box" onclick="toggleAlignment()">
+    <div id="targeting-box" onclick="lockTarget()">
         <div id="target-status">RETICLE: SEARCHING...</div>
     </div>
 
     <div id="terminal" onclick="focusInput()">
-        <div class="cmd-header">
-            Microsoft Windows [Version 10.0.22631.3527]<br>
-            (c) Microsoft Corporation. All rights reserved.
-        </div>
-
-        <pre class="ascii-banner">
+           <pre class="ascii-banner">
                                     ,
                                    |`\
                                   /'_/_
@@ -205,226 +180,251 @@
 
         </pre>
 
-        <div class="menu">
-            <div class="menu-item">Type [1] to ENGAGE OPTICAL CORE MODULE (AI)</div>
-            <div class="menu-item">Type [2] to CALIBRATE TELEMETRY SENSORS</div>
-            <div class="menu-item">Type [3] to NETWORK INTERFACE DIAGNOSTICS</div>
-            <div class="menu-item">Type [0] to SYSTEM PURGE (LOCAL APPLICATION RESET)</div>
-        </div>
+        <div>Type [1] to ENGAGE OPTICAL CORE</div>
+        <div>Type [0] to RESET LOCAL SYSTEM</div>
 
-        <div id="logs">C:\PEGASUS> Awaiting operational parameters...</div>
+        <div id="logs">C:\PEGASUS&gt; CRITICAL ERROR: CAMERA ACCESS DENIED OR UNAVAILABLE.</div>
 
-        <div class="cmd-line" onclick="triggerGesture()">
-            <span class="prompt-text">C:\PEGASUS&gt;</span>
-            <input type="number" id="cmd-input" inputmode="numeric" oninput="checkInput(event)" autofocus autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other">
+        <div class="cmd-line">
+            <span>C:\PEGASUS&gt;</span>
+            <input type="number" id="cmd-input" inputmode="numeric" oninput="checkInput(event)" autofocus="" autocomplete="off">
         </div>
     </div>
 
     <script>
-        const video = document.getElementById('video');
-        const cameraContainer = document.getElementById('camera-container');
-        const canvas = document.getElementById('detection-canvas');
-        const ctx = canvas.getContext('2d');
-        const terminal = document.getElementById('terminal');
-        const targetingBox = document.getElementById('targeting-box');
-        const targetStatus = document.getElementById('target-status');
-        const logs = document.getElementById('logs');
-        const cmdInput = document.getElementById('cmd-input');
-        
+        const video = document.getElementById("video");
+        const cameraContainer = document.getElementById("camera-container");
+        const canvas = document.getElementById("detection-canvas");
+        const ctx = canvas.getContext("2d");
+        const terminal = document.getElementById("terminal");
+        const targetingBox = document.getElementById("targeting-box");
+        const targetStatus = document.getElementById("target-status");
+        const logs = document.getElementById("logs");
+        const cmdInput = document.getElementById("cmd-input");
+
         let stream = null;
         let detectionModel = null;
         let detecting = false;
-        let lastLogTime = 0;
-        let userGestureActived = false;
+        let lockedObject = null;
+
+        let lastDetectionTime = 0;
+        const detectionInterval = 600;
+
+        let lastPredictions = [];
+        let loopStarted = false;
 
         function focusInput() {
             cmdInput.focus();
         }
 
-        function triggerGesture() {
-            userGestureActived = true;
+        function logMsg(message) {
+            logs.innerHTML = "C:\\PEGASUS&gt; " + message;
         }
 
         function checkInput(event) {
-            // O replace garante que espaços fantasmas do Android sejam destruídos
-            const val = cmdInput.value.replace(/\s+/g, '').trim();
-            
-            if (val === '1') {
-                startCamera();
-                cmdInput.value = '';
-            } else if (['0', '2', '3'].includes(val)) {
-                runCommand(val);
-                cmdInput.value = ''; 
-            }
-        }
+            const value = event.target.value.trim();
 
-        function runCommand(cmd) {
-            switch(cmd) {
-                case '2':
-                    logMsg("CALIBRATING GYROSCOPIC TELEMETRY... STATUS: OPERATIONAL.");
-                    break;
-                case '3':
-                    logMsg("INFRA LATENCY: 12ms. NETWORK LINK SECURE.");
-                    break;
-                case '0':
-                    resetLocalApplication();
-                    break;
-                default:
-                    logMsg("INVALID COMMAND REQUEST. RE-ENTER PARAMETERS.");
+            if (value === "1") {
+                startCamera();
+                event.target.value = "";
+            }
+
+            if (value === "0") {
+                resetLocalSystem();
+                event.target.value = "";
             }
         }
 
         async function startCamera() {
-            logMsg("INITIALIZING BACK OPTICAL CAPTURE PIPELINE...");
+            if (detecting) {
+                logMsg("OPTICAL CORE ALREADY ACTIVE.");
+                return;
+            }
+
             try {
-                // Acesso universal à câmera traseira (iPhone e Android)
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: { exact: "environment" } } 
-                }).catch(async (e) => {
-                    // Fallback de segurança se o Android não entender a exigência "exact"
-                    return await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: "environment" } 
-                    });
+                logMsg("INITIALIZING OPTICAL PIPELINE...");
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
+                    audio: false
                 });
-                
+
                 video.srcObject = stream;
-                
+
                 video.onloadedmetadata = async () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
 
-                    cameraContainer.style.display = 'block';
-                    terminal.classList.add('camera-active-mode');
-                    targetingBox.style.display = 'block';
-                    
-                    logMsg("DOWNLOADING COCO-SSD NEURAL NET WEIGHTS...");
-                    
+                    cameraContainer.style.display = "block";
+                    terminal.classList.add("camera-active-mode");
+                    targetingBox.style.display = "block";
+
                     if (!detectionModel) {
+                        logMsg("LOADING COCO-SSD OBJECT DETECTION MODEL...");
                         detectionModel = await cocoSsd.load();
                     }
-                    
-                    logMsg("OPTICAL COMPUTER VISION ONLINE. SCANNING PERIMETER...");
+
                     detecting = true;
-                    detectObjects();
+                    logMsg("OPTICAL CORE ONLINE. CENTER OBJECT AND TAP RETICLE TO LOCK.");
+
+                    if (!loopStarted) {
+                        loopStarted = true;
+                        detectObjects();
+                    }
                 };
-                
-            } catch (err) {
-                logMsg("CRITICAL ERROR: OPTICAL ACCESS PERMISSION DENIED.");
-                console.error(err);
+            } catch (error) {
+                console.error(error);
+                logMsg("CRITICAL ERROR: CAMERA ACCESS DENIED OR UNAVAILABLE.");
             }
         }
 
         async function detectObjects() {
-            if (!detecting || !detectionModel) return;
+            if (!detecting || !detectionModel) {
+                loopStarted = false;
+                return;
+            }
 
-            const predictions = await detectionModel.detect(video);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const now = Date.now();
 
-            let highestConfidencePred = null;
+            if (now - lastDetectionTime >= detectionInterval) {
+                lastDetectionTime = now;
 
-            predictions.forEach(prediction => {
-                const [x, y, width, height] = prediction.bbox;
-                const score = Math.round(prediction.score * 100);
+                const predictions = await detectionModel.detect(video);
+                lastPredictions = predictions.filter(prediction => prediction.score >= 0.50);
 
-                if (score < 55) return;
-
-                if (!highestConfidencePred || prediction.score > highestConfidencePred.score) {
-                    highestConfidencePred = prediction;
-                }
-
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = "#ffffff"; 
-                ctx.strokeRect(x, y, width, height);
-
-                ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                ctx.fillRect(x, y > 25 ? y - 25 : y, width > 200 ? 200 : width, 24);
-
-                ctx.fillStyle = "#ffffff";
-                ctx.font = "14px 'Consolas', monospace";
-                ctx.fillText(`SCAN: ${prediction.class.toUpperCase()} [${score}%]`, x + 5, y > 25 ? y - 8 : y + 16);
-            });
-
-            if (highestConfidencePred) {
-                const now = Date.now();
-                if (now - lastLogTime > 1500) { 
-                    const label = highestConfidencePred.class.toUpperCase();
-                    const conf = Math.round(highestConfidencePred.score * 100);
-                    logMsg(`OBJECT IDENTIFIED: ${label} | CONFIDENCE: ${conf}% | FRAME LOCK: STABLE`);
-                    lastLogTime = now;
-                }
+                drawPredictions(lastPredictions);
+                updateLockStatus(lastPredictions);
             }
 
             requestAnimationFrame(detectObjects);
         }
 
-        function toggleAlignment() {
-            if (targetingBox.classList.contains('aligned')) {
-                targetingBox.classList.remove('aligned');
+        function drawPredictions(predictions) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            predictions.forEach(prediction => {
+                if (lockedObject && prediction.class !== lockedObject.label) {
+                    return;
+                }
+
+                const [x, y, width, height] = prediction.bbox;
+                const score = Math.round(prediction.score * 100);
+
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = lockedObject ? "#00ff66" : "#ffffff";
+                ctx.strokeRect(x, y, width, height);
+
+                ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+                ctx.fillRect(x, y > 24 ? y - 24 : y, 190, 22);
+
+                ctx.fillStyle = lockedObject ? "#00ff66" : "#ffffff";
+                ctx.font = "14px Consolas";
+                ctx.fillText(`${prediction.class.toUpperCase()} ${score}%`, x + 5, y > 24 ? y - 8 : y + 16);
+            });
+        }
+
+        function updateLockStatus(predictions) {
+            if (!lockedObject) {
+                targetingBox.classList.remove("aligned");
                 targetStatus.innerText = "RETICLE: SEARCHING...";
+                return;
+            }
+
+            const candidates = predictions.filter(prediction => prediction.class === lockedObject.label);
+
+            if (candidates.length === 0) {
+                targetingBox.classList.remove("aligned");
+                targetStatus.innerText = "TARGET LOST: " + lockedObject.label.toUpperCase();
+                return;
+            }
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            let best = null;
+            let bestDistance = Infinity;
+
+            candidates.forEach(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+                const objectX = x + width / 2;
+                const objectY = y + height / 2;
+                const distance = Math.hypot(objectX - centerX, objectY - centerY);
+
+                if (distance < bestDistance) {
+                    best = prediction;
+                    bestDistance = distance;
+                }
+            });
+
+            if (bestDistance <= 90) {
+                targetingBox.classList.add("aligned");
+                targetStatus.innerText = "LOCKED: " + lockedObject.label.toUpperCase();
             } else {
-                targetingBox.classList.add('aligned');
-                targetStatus.innerText = "TARGET LOCKED / ALIGNMENT STABLE";
+                targetingBox.classList.remove("aligned");
+                targetStatus.innerText = "TRACKING: " + lockedObject.label.toUpperCase();
             }
         }
 
-        async function resetLocalApplication() {
-            logMsg("EXECUTING LOCAL APPLICATION RESET PROCEDURE...");
+        function lockTarget() {
+            if (!detecting || !detectionModel) {
+                logMsg("OPTICAL CORE IS OFFLINE. TYPE [1] FIRST.");
+                return;
+            }
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            const target = lastPredictions.find(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+
+                return (
+                    prediction.score >= 0.50 &&
+                    centerX >= x &&
+                    centerX <= x + width &&
+                    centerY >= y &&
+                    centerY <= y + height
+                );
+            });
+
+            if (target) {
+                lockedObject = {
+                    label: target.class
+                };
+
+                targetingBox.classList.add("aligned");
+                targetStatus.innerText = "LOCKED: " + target.class.toUpperCase();
+                logMsg("SYSTEM LOCKED ON: " + target.class.toUpperCase());
+
+                if (navigator.vibrate) {
+                    navigator.vibrate(100);
+                }
+            } else {
+                lockedObject = null;
+                targetingBox.classList.remove("aligned");
+                targetStatus.innerText = "RETICLE: NO TARGET";
+                logMsg("NO VALID OBJECT INSIDE RETICLE.");
+            }
+        }
+
+        function resetLocalSystem() {
             detecting = false;
+            loopStarted = false;
+            lockedObject = null;
+            lastPredictions = [];
 
-            try {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    stream = null;
-                }
-
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                localStorage.clear();
-                sessionStorage.clear();
-
-                if (window.indexedDB && indexedDB.databases) {
-                    const databases = await indexedDB.databases();
-                    await Promise.all(
-                        databases.map(db => {
-                            if (!db.name) return Promise.resolve();
-                            return new Promise((resolve) => {
-                                const request = indexedDB.deleteDatabase(db.name);
-                                request.onsuccess = resolve;
-                                request.onerror = resolve;
-                                request.onblocked = resolve;
-                            });
-                        })
-                    );
-                }
-
-                if ("caches" in window) {
-                    const cacheNames = await caches.keys();
-                    await Promise.all(
-                        cacheNames.map(cacheName => caches.delete(cacheName))
-                    );
-                }
-
-                if ("serviceWorker" in navigator) {
-                    const registrations = await navigator.serviceWorker.getRegistrations();
-                    await Promise.all(
-                        registrations.map(reg => reg.unregister())
-                    );
-                }
-
-                logMsg("LOCAL HARD RESET COMPLETED. EXECUTING SYSTEM COLD REBOOT...");
-
-                setTimeout(() => {
-                    window.location.reload();
-                }, 800);
-
-            } catch (error) {
-                console.error(error);
-                logMsg("CRITICAL ARTIFACT EXCEPTION ENCOUNTERED DURING APPMEM PURGE.");
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
             }
-        }
 
-        function logMsg(msg) {
-            logs.innerHTML = "C:\\PEGASUS&gt; " + msg;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            window.location.reload();
         }
     </script>
-</body>
-</html>
+
+
+</body></html>
